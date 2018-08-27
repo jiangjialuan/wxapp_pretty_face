@@ -1,0 +1,206 @@
+<style lang="less" scoped>
+  .scree1{
+    .desc{
+      text-align:center;
+      color:#424242;
+      font-size:36rpx;
+      margin-bottom:104rpx;
+      padding-top:97rpx;
+    }
+    .flock_rank{
+      padding-top:20rpx;
+      justify-content:center;
+      display:flex;
+      flex-direction:row;
+      align-items:center;
+      justify-content:center;
+      .mid,.left,.right{
+        display:flex;
+        flex-direction:column;
+        justify-content:center;
+        align-items:center;
+        text{
+          &:last-child{
+            color:#424242;
+            font-size:24rpx;
+          }
+          text-align:center;
+        }
+        .icon{
+          width:75rpx;
+          height:61rpx;
+          margin-bottom:-6rpx;
+        }
+        .head{
+          width:200rpx;
+          height:200rpx;
+          border-radius:200rpx;
+          border:6rpx solid #ff5090;
+          margin-bottom:27rpx;
+
+        }
+      }
+      .left{
+       text:first-child{
+        color:#3d3d3d;
+        font-size:48rpx;
+       }
+      }
+      .right{
+       text:first-child{
+        color:#ff5090;
+        font-size:48rpx;
+       }
+      }
+      .mid{
+        padding:0rpx 60rpx;
+        text:last-child{
+          font-size:36rpx;
+        }
+      }
+    }
+  }
+  .pkbtn{
+        width:650rpx;
+        height:88rpx;
+        line-height:88rpx;
+        background:rgba(255,80,144,1);
+        color:#fff;
+        font-size:36rpx;
+        border-radius:29rpx;
+        margin-bottom:27rpx;
+        &.pkshare{
+          background:#fff;
+          color:#ff5090;
+          border:1rpx solid #ff5090;
+        }
+   }
+   .vsmain2{
+              display:flex;
+              flex-direction:column;
+              align-items:center;
+              justify-content:center;
+              padding:107.6rpx 71.2rpx 120rpx 71.2rpx;
+              image{
+                 width:200rpx;
+                 height:200rpx;
+                 border-radius:200rpx;
+                 margin-bottom:30rpx;
+              }
+              .name{
+                 width:200rpx;
+                 height:40rpx;
+                 line-height:35rpx;
+                 overflow: hidden;
+                 text-overflow: ellipsis;
+                 white-space: nowrap;
+                 font-size:36rpx;
+                 margin-bottom:26rpx;
+                 text-align:center;
+              }
+              .score{
+                  font-size:48rpx;
+                  margin-bottom:10rpx;
+              }
+        }
+
+</style>
+
+<template>
+  <view class="scree1"  wx:if="{{isShow}}">
+       <view class="vsmain2">
+          <image src="{{userInfo.head_pic}}" class=""></image>
+          <view class="name">{{userInfo.name}}</view>
+          <!--<text class="score">84</text>
+          <text class="scoredesc">颜值分</text>-->
+       </view>
+       <view class="desc">
+          <view>真的打算静静地美下去吗?</view>
+          <view>赶紧跟群友一绝颜值高下吧~</view>
+       </view>
+       <button class="pkbtn" bindtap="pkface"> PK群友颜值 </button>
+    </view>
+    <view class="scree1" wx:else>
+      <view class="flock_rank">
+        <view class="left">
+          <text>{{myData.self_ranking}}</text>
+          <text>群内排名</text>
+        </view>
+        <view class="mid">
+          <image class="icon" src="../image/crown_1.png"></image>
+          <image class="head" src="{{myData.head_pic}}"></image>
+          <text>{{userInfo.name}}</text>
+        </view>
+        <view class="right">
+          <text>{{myData.face_score}}</text>
+          <text>颜值分</text>
+        </view>
+      </view>
+      <view class="desc">颜值逆天，活捉大美女一枚</view>
+      <button class="pkbtn" bindtap="pkface"> 不服，再次PK </button>
+      <button class="pkbtn pkshare" open-type="share"> 此群已无敌，转战其它群 </button>
+    </view>
+
+</template>
+
+<script>
+import wepy from 'wepy'
+import api from '../common/api'
+export default class User extends wepy.component  {
+  config = {
+    'navigationBarTitleText': '我的',
+  }
+  components = {
+  }
+  data = {
+    userInfo:{},
+    isShow:'',
+    myData:{
+      self_ranking:true,
+      head_pic:"",
+      face_score:0
+    },
+  }
+
+  computed = {
+
+  }
+  methods = {
+    pkface(){
+      if(!this.userInfo.name){
+        api.getAuthorize().then(res=>{
+          this.userInfo=res;
+          this.$apply();
+          api.pkFaceMark(this);
+        });
+      }else{
+        api.pkFaceMark(this);
+      }
+    }
+  }
+  events = {
+    setUserInfo(data){
+      this.userInfo=data;
+      this.$apply();
+    },
+    //设置个人数据
+    setMyData(data){
+      this.myData=data;
+      this.$apply();
+    },
+  }
+  onLoad() {
+    if(this.myData.self_ranking>0){
+      this.isShow=false;
+    }
+    this.userInfo=wx.getStorageSync('userInfo');
+    this.$apply();
+  }
+  onShow(){
+  }
+  //从相册选择图片回调处理函数
+  showCropper(res){
+    this.$emit('showCropper',res);
+  }
+}
+</script>

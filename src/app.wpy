@@ -1,0 +1,56 @@
+<style lang="less">
+.hidden{
+display:none;
+}
+button{
+  &::after{
+     border: 0;
+  }
+}
+</style>
+
+<script>
+import wepy from 'wepy'
+import 'wepy-async-function'
+
+export default class extends wepy.app {
+  globalData = {
+    userInfo: null,
+    color:"#2196f3"
+  }
+  config = {
+    pages: [
+
+      'pages/index',
+      'pages/detail',
+      'pages/faceMark',
+      'pages/test',
+    ],
+    window: {
+      backgroundTextStyle: 'light',
+      navigationBarTitleText: 'WeChat',
+      navigationBarBackgroundColor: "#000",
+      navigationBarTextStyle:''
+    }
+  }
+
+  onLaunch(options) {
+    wx.setStorageSync('open_gid','');
+  }
+  onShow(options){
+    wx.setStorageSync('shareTicket', '');
+    if (options.scene == 1044) {
+       wx.setStorageSync('shareTicket', options.shareTicket);
+    }
+  }
+  constructor() {
+     super();
+     this.use('promisify');
+     this.use('requestfix');
+  }
+
+  getUserInfo(cb) {
+      console.log("userInfo");
+  }
+}
+</script>

@@ -1,0 +1,65 @@
+<style lang="less" scoped>
+
+</style>
+
+<template>
+<welCropper></welCropper>
+<button bindtap='selectTap'>选择图片</button>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import welCropper from "../pages/welCropper"
+
+  export default class Index extends wepy.page {
+    config = {
+      navigationBarTitleText: '来呀，比颜值哇',
+    }
+    components = {
+      welCropper:welCropper,
+    }
+    data = {
+
+    }
+    computed = {
+
+    }
+    methods = {
+      selectTap(){
+        wx.chooseImage({
+          count: 1, // 默认9
+          sizeType: ['original', 'compressed'], // 可以指定是原图还是压缩图，默认二者都有
+          sourceType: ['album', 'camera'], // 可以指定来源是相册还是相机，默认二者都有
+          success:(res)=>{
+            this.tempFilePath = res.tempFilePaths[0];
+            wx.getImageInfo({
+              src: res.tempFilePaths[0],
+              success: (res)=> {
+                this.$broadcast('showCropper',{
+                  src: this.tempFilePath,
+                  isHidden:false,
+                  originalSize:{
+                    width:res.width,
+                    height:res.height
+                  }
+                })
+              }
+            })
+
+          },
+          fail:(res)=>{
+            console.log("error");
+          }
+        })
+      }
+    }
+    events = {
+
+    }
+    onLoad() {
+
+    }
+
+
+  }
+</script>

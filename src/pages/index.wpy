@@ -1,0 +1,244 @@
+<style lang="less" scoped>
+.home{
+  padding-top:88rpx;
+  .menue{
+    display:flex;
+    flex-direction:row;
+    align-items:center;
+    justify-content:space-between;
+    padding:2rpx 0rpx;
+    height:88rpx;
+    background:#fff;
+    border-bottom:1rpx solid rgba(234,234,234,1);
+    position:fixed;
+    top:0rpx;
+    left:0rpx;
+    right:0rpx;
+    z-index:99;
+    .menueBar{
+       position:absolute;
+       height:6rpx;
+       width:100rpx;
+       top:86rpx;
+       left:0rpx;
+       background:#ff5090;
+       transition: transform .3s ease;
+    }
+    @keyframes mymove
+    {
+    from {left:140rpx;}
+    to {left:510rpx;}
+    }
+    @keyframes mymove1
+    {
+       from {left:510rpx;}
+       to {left:140rpx;}
+    }
+    .menueItem{
+      width:50%;
+      text-align:center;
+      height:60rpx;
+      text{
+        display:inline-block;
+        font-size:36rpx;
+        &.active{
+          color:#ff5090;
+        }
+      }
+      &.hover{
+        opacity:0.7;
+      }
+    }
+    .menueItem:first-child{
+      border-right:2rpx solid #cfcfcf;
+    }
+  }
+
+}
+ .camera{
+    position:fixed;
+      top:0rpx;
+      bottom:0rpx;
+      left:0rpx;
+      right:0rpx;
+      z-index:999;
+      camera{
+      width:100%;
+      height:100%;
+      }
+    .cameraTakePhoto{
+         position:fixed;
+         bottom:100rpx;
+         left:50%;
+         margin-left:-50rpx;
+         width:150rpx;
+         height:150rpx;
+         border-radius:150rpx;
+         background:#fff;
+         z-index:9999;
+         opacity:0.8;
+    }
+ }
+
+</style>
+<template>
+<welCropper></welCropper>
+<view class="home {{isShow?'':'hidden'}}" wx:if="{{hasFromUid==1}}" >
+  <view class="menue">
+    <view class="menueItem" hover-class="hover" @tap="changeType(0)"><text class="{{current==0?'active':''}}" >群</text></view>
+    <view class="menueItem" hover-class="hover" @tap="changeType(1)" wx:if="{{myData.self_ranking>0}}"><text class="{{current==1?'active':''}}" >我屈居第{{myData.self_ranking}}</text></view>
+    <view class="menueItem" hover-class="hover" @tap="changeType(1)" wx:else><text class="{{current==1?'active':''}}" >我</text></view>
+    <view class="menueBar" style="transform:translateX({{current==0?windowW*140/750:windowW*510/750}}px)"></view>
+  </view>
+  <swiper indicator-dots="{{indicatorDots}}" bindchange="swiperChange" current="{{current}}"
+    autoplay="{{autoplay}}"  duration="{{duration}}" style="height:{{750*windowH/windowW-88+'rpx'}}">
+       <swiper-item>
+          <groupList></groupList>
+       </swiper-item>
+       <swiper-item>
+           <Me></Me>
+       </swiper-item>
+  </swiper>
+</view>
+<result wx:if="{{hasFromUid==2}}" :from_uid="from_uid" class="{{isShow?'':'hidden'}}"></result>
+
+</template>
+
+<script>
+import wepy from 'wepy'
+import grouplist from '../pages/groupList';
+import me from '../pages/my';
+import api from '../common/api';
+import welCropper from "../pages/welCropper";
+import result from "../pages/result"
+export default class Index extends wepy.page {
+  config = {
+    navigationBarTitleText: '来呀，比颜值哇',
+  }
+  components = {
+    groupList: grouplist,
+    Me: me,
+    welCropper: welCropper,
+    result: result,
+  }
+  data = {
+    devicePosition: "back",
+    isShow: false,
+    indicatorDots: false,
+    autoplay: false,
+    duration: 500,
+    windowW: '',
+    windowH: '',
+    current: '',
+    userInfo: {},
+    myData: {
+      self_ranking: 0,
+      head_pic: "",
+      face_score: 0
+    },
+    hasFromUid: '',
+    isShow:false
+  }
+  computed = {}
+  methods = {
+    //切换
+    swiperChange(e){
+      if (e.detail.current === 0) this.current = 0;
+      else this.current = 1;
+      this.$apply();
+    },
+    //点击群，我进行切换
+    changeType(id){
+      if (id == 1) {
+        if (!this.userInfo.name) {
+          api.getAuthorize().then(res => {
+            this.userInfo = res;
+            this.$broadcast('setUserInfo', res);
+            this.current = id;
+            this.$apply();
+          });
+        } else this.current = id;
+      } else this.current = id;
+      this.$apply();
+    },
+  }
+  events = {
+    //获取我的个人数据
+    setMyData(data){
+      this.isShow=true;
+      this.$broadcast('setMyData', data);
+      this.myData = data;
+      this.$apply();
+    },
+
+    //从相册选择图片回调处理函数
+    showCropper(res){
+      this.$broadcast('showCropper', {
+        src: res.path,
+        isHidden: false,
+        originalSize: {
+          width: res.width,
+          height: res.height
+        },
+        cropCallback: (res) => {
+          wx.setStorageSync('pkPhoto', res);
+          wx.redirectTo({
+            url: `/pages/faceMark?from_index=1`
+          });
+        }
+      })
+    }
+  }
+
+  onLoad(options) {
+    if (wx.getStorageSync('shareTicket')) this.hasFromUid = 1;
+    else {
+      this.hasFromUid = 2;
+      if (options.frome_uid) {
+        wx.setStorageSync('frome_uid', options.frome_uid);
+        api.checkLogin().then(res => {
+          this.$broadcast('getResultData', options.frome_uid);
+          this.isShow=true;
+          this.$apply();
+        });
+      }
+    }
+    if (!options.open_gid) this.current = 0;
+    else this.current = 1;
+    wx.showShareMenu({
+      withShareTicket: true
+    })
+    this.userInfo = wx.getStorageSync('userInfo');
+    wx.getSystemInfo({
+      success: (res) => {
+        this.windowW = res.windowWidth;
+        this.windowH = res.windowHeight;
+        this.$apply();
+      }
+    });
+    this.$apply();
+  }
+
+
+  onShow(options) {
+  }
+
+
+  onShareAppMessage(res) {
+    return {
+      title: '来呀，比颜值哇',
+      path: 'pages/index?frome_uid=' + this.userInfo.uid,
+      imageUrl: '',
+      success: (res) => {
+        wx.showToast({
+          title: '分享成功',
+          icon: 'success',
+          duration: 1500
+        })
+      },
+      fail: (res) => {}
+    };
+  }
+}
+
+</script>

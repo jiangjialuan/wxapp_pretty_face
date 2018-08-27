@@ -1,0 +1,889 @@
+<style lang="less" scoped>
+.cropper_main_container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 100;
+    width: 750rpx;
+    height: 100vh;
+    background: #555;
+    overflow: hidden;
+}
+
+.cropper_main_container.hidden {
+    display: none;
+}
+
+.cropper_container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+}
+
+/* button */
+
+.cropper_toolbar {
+    position: absolute;
+    z-index: 100;
+    bottom: 0;
+    height: 50px;
+    background: black;
+    width: 100%;
+    line-height: 50px;
+    font-size: 15px;
+    text-align: center;
+    color: white;
+}
+
+.cropper_toolbar .button_item {
+    /* width: 70px; */
+    float: left;
+    width: 25%;
+    height: 50px;
+}
+
+/* cancel_button */
+
+/* .cancel_button {
+    position: absolute;
+    left: 0;
+    top: 0;
+} */
+
+/* original_button */
+
+/* .original_button {
+    position: relative;
+    margin: 0 auto;
+    width: 70px;
+    height: 50px;
+} */
+
+.original_button .check_container {
+    position: relative;
+    float: left;
+    margin-top: 14px;
+    width: 18px;
+    height: 18px;
+    border: 1px solid white;
+}
+
+.original_button.checked {
+    background: #26ab28;
+}
+
+/* .original_button .check_container .check_border {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1px solid #fff;
+    overflow: hidden;
+}
+
+.original_button .check_container .check_center {
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+.original_button.checked .check_container .check_center {
+    background: #26ab28;
+}
+
+.original_button .check_text {
+    float: left;
+    width: 50px;
+} */
+
+/* rotate image */
+
+/* .rotate_button {
+    position: absolute;
+    left: 50px;
+    top: 0;
+} */
+
+/* crop_image_button */
+
+ .crop_image_button {
+    /* position: absolute;
+    right: 0;
+    top: 0; */
+    color: #26ab28;
+}
+
+.crop_image_button.disable {
+    /* color: #038905;  */
+    color: rgba(0, 0, 0, 0);
+}
+
+/* canvas */
+
+.cropper_movable_area_container {
+    position: absolute;
+}
+
+.cropper_canvas_container {
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+
+/* opacity:0隐藏，如果想看就设置为1，只能在测试机能看到，真机上canvas层级在最高层 */
+
+.cropper_movable_area_container .move_item {
+    z-index: 100;
+    /* opacity: 0.7;   */
+    opacity: 0;
+    background: white;
+    border-radius: 50%;
+}
+
+.cropper_canvas_container .canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    /* opacity: 0; */
+}
+
+/* 因为display:none在真机上会造成无法截取图片，所以这里是通过移到显示区域外来达到隐藏效果的 */
+
+.original_canvas {
+    position: absolute;
+    left: 750rpx;
+    top: 100vh;
+}
+
+</style>
+
+<template>
+<scroll-view class="cropper_main_container {{ishidden?'hidden':''}}">
+   <view class="cropper_container">
+      <canvas class="original_canvas" canvas-id="originalCanvas" style="width:{{cropperChangableData.originalSize.width}}px;height:{{cropperChangableData.originalSize.height}}px;"></canvas>
+      <view class='cropper_canvas_container'>
+         <canvas class="canvas" canvas-id="canvas" style="left:{{cropperData.left}}px;top:{{cropperData.top}}px;width:{{cropperChangableData.scaleSize.width}}px;height:{{cropperChangableData.scaleSize.height}}px;"></canvas>
+         <canvas class="move_canvas" canvas-id="moveCanvas" style="left:{{cropperData.left}}px;top:{{cropperData.top}}px;width:{{cropperChangableData.scaleSize.width}}px;height:{{cropperChangableData.scaleSize.height}}px;"></canvas>
+         <movable-area class="cropper_movable_area_container" style="left:{{cropperData.left}}px;top:{{cropperData.top}}px;width:{{cropperChangableData.scaleSize.width}}px;height:{{cropperChangableData.scaleSize.height}}px;">
+            <block wx:if="{{cropperMovableItems}}">
+            <block wx:for="{{cropperMovableItems}}" wx:key="moveItem">
+            <movable-view class="move_item" style="width:{{cropperData.itemLength}}px; height:{{cropperData.itemLength}}px;" direction="all" x="{{item.x-cropperData.itemLength/2}}" y="{{item.y-cropperData.itemLength/2}}" bindtouchmove="moveEvent" bindtouchend="endEvent" data-key="{{index}}"></movable-view>
+            </block>
+            </block>
+            <!--<movable-view class="move_item" style="width:{{cropperChangableData.scaleSize.width}}px;height:{{cropperChangableData.scaleSize.height}}px" direction="all" x="{{cropperMovableItems.topleft.x}}" y="{{cropperMovableItems.topleft.y}}"></movable-view>-->
+         </movable-area>
+      </view>
+   </view>
+   <view class="cropper_toolbar">
+      <view class="button_item cancel_button" bindtap="hideCropper">取消</view>
+      <view class="button_item rotate_button" bindtap="rotateImage">旋转</view>
+      <view class="crop_image_button button_item" bindtap="{{cropperChangableData.canCrop?'cropImage':''}}">完成</view>
+   </view>
+</scroll-view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  export default class welCropper extends wepy.component {
+    config = {
+      navigationBarTitleText: '来呀，比颜值哇',
+    }
+    components = {
+
+    }
+    data = {
+      ishidden:true,
+      W:'',
+      H:'',
+      cropperData: {
+        hidden: true,
+        left: 0,
+        top: 0,
+        width: this.W,
+        height: this.H,
+        itemLength: 50,
+        imageInfo: {
+          path: '',
+          width: 0,
+          height: 0
+        },
+        scaleInfo: {
+          x: 1,
+          y: 1
+        },
+        cropCallback: null,
+        sizeType: ['original', 'compressed'],    //'original'(default) | 'compressed'
+        original: false,  // 默认压缩，压缩比例为截图的0.4
+        mode: 'rectangle', //默认矩形
+      },
+      cropperMovableItems: {
+        topleft: {
+          x: 50,
+          y: 50
+        },
+        topright: {
+          x: this.W - 50,
+          y: 50
+        },
+        bottomleft: {
+          x: 50,
+          y: this.H - 50
+        },
+        bottomright: {
+          x: this.W - 50,
+          y: this.H - 50
+        }
+      },
+      cropperChangableData: {
+        canCrop: true,
+        rotateDegree: 0,
+        originalSize: {
+          width: 0,
+          height: 0
+        },
+        scaleSize: {
+          width: 0,
+          height: 0
+        }
+      }
+    }
+    computed = {
+
+    }
+    methods = {
+    //点击取消触发事件
+    hideCropper(){
+      let that = this
+
+      this.ishidden = true
+      this.cropperData.cropCallback = null
+
+      this.cropperMovableItems= {
+        topleft: {
+          x: -1,
+            y: -1
+        },
+        topright: {
+          x: -1,
+            y: -1
+        },
+        bottomleft: {
+          x: -1,
+            y: -1
+        },
+        bottomright: {
+          x: -1,
+            y: -1
+        }
+      };
+      this.cropperChangableData= {
+        canCrop: true,
+        rotateDegree: 0
+      };
+
+      this.clearCanvas(this.cropperData.imageInfo)
+    },
+
+
+    //旋转
+    rotateImage(){
+      let that = this
+      let imageInfo = this.cropperData.imageInfo
+      let width = imageInfo.width
+      let height = imageInfo.height
+      let rotateDegree = this.cropperChangableData.rotateDegree
+
+      rotateDegree = rotateDegree == 360 ? 90 : rotateDegree + 90
+
+      // 判断是否为垂直方向
+      let isVertical = rotateDegree % 180 > 0
+      let rotateWidth = isVertical ? height : width
+      let rotateHeight = isVertical ? width : height
+
+      let size = this.getAdjustSize(this.W, this.H, rotateWidth, rotateHeight)
+
+      // 适应屏幕的位置
+      let left = (this.W - size.width) / 2
+      let top = (this.H - size.height) / 2
+      let cropperData = that.data.cropperData
+
+      cropperData.left = left
+      cropperData.top = top
+
+      let cropperChangableData = this.cropperChangableData
+      cropperChangableData.originalSize = {
+        width: rotateWidth,
+        height: rotateHeight
+      }
+      cropperChangableData.scaleSize = {
+        width: size.width,
+        height: size.height
+      }
+      cropperChangableData.rotateDegree = rotateDegree
+      this.cropperChangableData=cropperChangableData;
+      this.cropperData=cropperData;
+
+      this.loadImage(imageInfo.path, rotateWidth, rotateHeight, true)
+    },
+    //moveEvent移动开始
+    moveEvent(e){
+    debugger;
+      let that = this
+      let key = e.currentTarget.dataset.key
+      let originalSize = this.cropperChangableData.originalSize
+
+      this.setupMoveItem(key, e.changedTouches, {
+        path: this.cropperData.imageInfo.path,
+        width: originalSize.width,
+        height: originalSize.height
+      })
+    },
+    //moveEnd移动结束
+    endEvent(e){
+      let that = this
+      let cropperData = this.cropperData;
+      let cropperMovableItems = this.cropperMovableItems;
+      let cropperChangableData = this.cropperChangableData
+      let originalSize = cropperChangableData.originalSize
+      let key = e.currentTarget.dataset.key
+
+      this.setupMoveItem(key, e.changedTouches, {
+        path: this.cropperData.imageInfo.path,
+        width: originalSize.width,
+        height: originalSize.height
+      }, (cropperMovableItems, canCrop) => {
+        cropperChangableData.canCrop = canCrop;
+        this.cropperChangableData=cropperChangableData;
+        this.cropperMovableItems=cropperMovableItems;
+        this.$apply();
+      })
+    },
+    //截取选中图片，若有回调则调用回调
+    cropImage(){
+      let that = this;
+      let cropperData = this.cropperData;
+      let mode = cropperData.mode;
+      let scaleInfo = cropperData.scaleInfo;
+      let width = cropperData.width
+      let height = cropperData.height
+
+      let cropperMovableItems = this.cropperMovableItems;
+      if (mode == 'rectangle') {
+        let maxX = 0, maxY = 0
+        for (let key in cropperMovableItems) {
+          let item = cropperMovableItems[key]
+          maxX = item.x > maxX ? item.x : maxX
+          maxY = item.y > maxY ? item.y : maxY
+        }
+
+        let minX = maxX, minY = maxY
+        for (let key in cropperMovableItems) {
+          let item = cropperMovableItems[key]
+          minX = item.x < minX ? item.x : minX
+          minY = item.y < minY ? item.y : minY
+        }
+
+        let w = maxX - minX, h = maxY - minY
+        w *= scaleInfo.x
+        h *= scaleInfo.y
+
+        let x = minX * scaleInfo.x, y = minY * scaleInfo.y
+
+
+        let ctx = wx.createCanvasContext("originalCanvas")
+
+        wx.showLoading({
+          title: '正在截取...',
+        })
+        wx.canvasToTempFilePath({
+          x: x,
+          y: y,
+          width: w,
+          height: h,
+          destWidth: w,
+          destHeight: h,
+          canvasId: 'originalCanvas',
+          success:(res)=> {
+            let tempFilePath = res.tempFilePath
+
+            wx.hideLoading()
+
+            //wx.saveImageToPhotosAlbum({
+              //filePath: tempFilePath,
+              //success(res) {
+              //}
+           //})
+
+            if (this.cropperData.cropCallback) {
+              this.ishidden=true;
+              this.$apply();
+              this.cropperData.cropCallback(tempFilePath)
+            }
+          },
+          fail(res) {
+          }
+        })
+      }
+      else {
+        let res = [[0, 0], [0, 0], [0, 0], [0, 0]]
+        let points = []
+        for (let key in cropperMovableItems) {
+          let x = Math.ceil(cropperMovableItems[key].x * scaleInfo.x)
+          let y = Math.ceil(cropperMovableItems[key].y * scaleInfo.y)
+
+
+          let index = 0
+          if (key == 'topleft') {
+            index = 0
+          }
+          else if (key == 'bottomleft') {
+            index = 1
+          }
+          else if (key == 'bottomright') {
+            index = 2
+          }
+          else if (key == 'topright') {
+            index = 3
+          }
+          res[index] = [x, y]
+
+          points.push({ x, y })
+        }
+
+        this.convexHull(points, points.length);
+
+        if (this.cropperData.cropCallback) {
+          this.ishidden=true;
+          this.$apply();
+          this.cropperData.cropCallback(res)
+        }
+      }
+    }
+    }
+    events = {
+      showCropper(options){
+        this.ishidden=options.isHidden;
+        this.loadImage(options.src,options.originalSize.width,options.originalSize.height,0);
+        this.cropperData.cropCallback=options.cropCallback;
+        this.$apply();
+      }
+    }
+    onLoad() {
+      wx.getSystemInfo({
+        success: (res)=>{
+          this.W=res.windowWidth;
+          this.H=res.windowHeight-50;
+          this.$apply();
+        }
+      });
+    }
+
+    //获取适应屏幕的图片显示大小
+    getAdjustSize(W, H, width, height){
+      if (width > W) {
+        height = W / width * height
+        width = W
+      }
+
+      if (height > H) {
+        width = H / height * width
+        height = H
+      }
+
+      return {
+        width: width,
+        height: height
+      }
+    }
+    //根据图片大小设置canvas大小
+    loadImage(src, width, height, isRotate){
+      let that = this;
+      let size = this.getAdjustSize(this.W, this.H, width, height);
+
+      // 适应屏幕的位置
+      let left = (this.W - size.width) / 2
+      let top = (this.H - size.height) / 2
+
+      // set data
+      if (!isRotate) {
+        this.cropperData.imageInfo = {
+          path: src,
+          width: width,
+          height: height
+        }
+      }
+      this.cropperData.left = left;
+      this.cropperData.top = top;
+      this.cropperData.width = size.width
+      this.cropperData.height = size.height
+
+      let compressedScale = this.cropperData.original ? 1.0 : 0.4
+
+      this.cropperData.scaleInfo = {
+        x: width * compressedScale / size.width,
+        y: height * compressedScale / size.height
+      }
+
+      this.cropperMovableItems = {
+        topleft: {
+          x: 50,
+          y: 50
+        },
+        topright: {
+          x: size.width - 50,
+          y: 50
+        },
+        bottomleft: {
+          x: 50,
+          y: size.height - 50
+        },
+        bottomright: {
+          x: size.width - 50,
+          y: size.height - 50
+        }
+      }
+
+      this.cropperChangableData.originalSize = {
+        width: width,
+        height: height
+      }
+      this.cropperChangableData.scaleSize = {
+        width: size.width,
+        height: size.height
+      }
+      this.$apply();
+
+
+      this.drawImage({
+        path: this.cropperData.imageInfo.path,
+        width: width,
+        height: height
+      })
+      this.drawLines(this.cropperMovableItems, this.cropperData.imageInfo)
+    }
+
+    //绘制图片
+    drawImage(imageInfo){
+      let that = this
+      let cropperData = this.cropperData
+      let size = this.getAdjustSize(this.W, this.H, imageInfo.width, imageInfo.height)
+
+      if (imageInfo.path != '') {
+        let path = imageInfo.path
+        let compressedScale = this.cropperData.original ? 1.0 : 0.4
+        let rotateDegree = this.cropperChangableData.rotateDegree;
+
+        //绘制原图
+        this.drawImageWithDegree(
+          "originalCanvas",
+          path,
+          imageInfo.width * compressedScale,
+          imageInfo.height * compressedScale,
+          rotateDegree
+        )
+
+        //绘制选择区图片
+        this.drawImageWithDegree("canvas", path, size.width, size.height, rotateDegree)
+      }
+    }
+    drawImageWithDegree(canvasId, path, width, height, degree) {
+      let ctx = wx.createCanvasContext(canvasId)
+
+      let isVertical = degree % 180 > 0
+
+      let drawWidth = isVertical ? height : width
+      let drawHeight = isVertical ? width : height
+
+      let centerX = width / 2
+      let cneterY = height / 2
+
+      let drawCenterX = drawWidth / 2
+      let drawCneterY = drawHeight / 2
+
+      let d = Math.abs(width-height)/2
+
+      ctx.translate(centerX, cneterY)
+      ctx.rotate(degree * Math.PI / 180)
+      ctx.translate(-centerX, -cneterY)
+
+      if (isVertical) {
+        if (drawHeight > drawWidth) {
+          ctx.drawImage(path, d, -d, drawWidth, drawHeight)
+        }
+        else {
+          ctx.drawImage(path, -d, d, drawWidth, drawHeight)
+        }
+      }
+      else {
+        ctx.drawImage(path, 0, 0, drawWidth, drawHeight)
+      }
+      ctx.draw();
+    }
+    drawLines(cropperMovableItems, imageInfo, callback){
+      let that = this
+      let cropperData = this.cropperData
+      let mode = this.cropperData.mode
+      let size = this.getAdjustSize(this.W, this.H, imageInfo.width, imageInfo.height);
+
+      let convexDots = []
+      let orderedDots = []
+
+      orderedDots.push(cropperMovableItems['topleft'])
+      orderedDots.push(cropperMovableItems['topright'])
+      orderedDots.push(cropperMovableItems['bottomright'])
+      orderedDots.push(cropperMovableItems['bottomleft'])
+
+      // 获取凸边形的点
+      convexDots = this.convexHull(orderedDots, orderedDots.length)
+
+      // 四个点组成的四边形是不是凸四边形
+      let canCrop = convexDots.length == 4
+      if (callback) {
+        callback(canCrop)
+      }
+
+      let ctx = wx.createCanvasContext("moveCanvas")
+
+      //绘制高亮选中区域
+      let rect = this.getCropRect(convexDots)
+
+      if (mode == 'rectangle') {
+        // 绘制半透明遮罩
+        ctx.setFillStyle('rgba(0,0,0,0.5)')
+        ctx.fillRect(0, 0, size.width, size.height)
+
+        // 清除选中区域的半透明遮罩，使选中区域高亮
+        ctx.setFillStyle('rgba(0,0,0,0)')
+        ctx.clearRect(rect.x, rect.y, rect.w, rect.h)
+
+        //绘制选中边框
+        ctx.setStrokeStyle('white')
+        ctx.setLineWidth(2)
+        ctx.beginPath()
+        ctx.moveTo(rect.x, rect.y)
+        ctx.lineTo(rect.x + rect.w, rect.y)
+        ctx.lineTo(rect.x + rect.w, rect.y + rect.h)
+        ctx.lineTo(rect.x, rect.y + rect.h)
+        ctx.lineTo(rect.x, rect.y)
+
+        ctx.stroke()
+        ctx.closePath()
+      }
+      else {
+        //绘制选中边框
+        // 如果四个点组成的四边形不是凸四边形，则显示红色，表示不可取
+        let color = canCrop ? 'white' : 'red'
+
+        ctx.setStrokeStyle(color)
+        ctx.setLineWidth(2)
+        ctx.beginPath()
+        for (let i = 0, len = convexDots.length; i < len; i++) {
+          let dot = convexDots[i]
+          if (i == 0) {
+            ctx.moveTo(dot.x, dot.y)
+          }
+          else {
+            ctx.lineTo(dot.x, dot.y)
+          }
+        }
+        let dot = convexDots[0]
+        ctx.lineTo(dot.x, dot.y)
+
+        ctx.stroke()
+        ctx.closePath()
+      }
+
+      //绘制四个角
+      let cornerType = mode == 'rectangle' ? 'rect' : 'circle'
+      ctx.setFillStyle('white')
+      ctx.setStrokeStyle('white')
+
+      // 绘制不同样式的角
+      if (cornerType == 'circle') {
+        for (let i = 0, len = orderedDots.length; i < len; i++) {
+          let dot = orderedDots[i]
+
+          ctx.beginPath()
+          ctx.arc(dot.x, dot.y, 10, 0, 2 * Math.PI, true)
+          ctx.fill()
+          ctx.closePath()
+        }
+      }
+      else if (cornerType == 'rect') {
+        let len = 20, w = 3.0, offset = w / 2.0
+
+        ctx.setLineWidth(w)
+        ctx.beginPath()
+
+        ctx.moveTo(rect.x - offset, rect.y - offset + len)
+        ctx.lineTo(rect.x - offset, rect.y - offset)
+        ctx.lineTo(rect.x - offset + len, rect.y - offset)
+
+        ctx.moveTo(rect.x + offset + rect.w - len, rect.y - offset)
+        ctx.lineTo(rect.x + offset + rect.w, rect.y - offset)
+        ctx.lineTo(rect.x + offset + rect.w, rect.y - offset + len)
+
+        ctx.moveTo(rect.x + offset + rect.w, rect.y + offset + rect.h - len)
+        ctx.lineTo(rect.x + offset + rect.w, rect.y + offset + rect.h)
+        ctx.lineTo(rect.x + offset + rect.w - len, rect.y + offset + rect.h)
+
+        ctx.moveTo(rect.x - offset, rect.y + offset + rect.h - len)
+        ctx.lineTo(rect.x - offset, rect.y + offset + rect.h)
+        ctx.lineTo(rect.x - offset + len, rect.y + offset + rect.h)
+
+        ctx.stroke()
+
+        ctx.closePath()
+      }
+
+      ctx.draw()
+    }
+
+    convexHull(points, n) {
+      if (n < 3) return;
+      var hull = [];
+      var l = 0;
+      for (var i = 1; i < n; i++) {
+        if (points[i].x < points[l].x) {
+          l = i;
+        }
+      }
+
+      var p = l, q;
+      do {
+
+        hull.push(points[p]);
+
+        q = (p + 1) % n;
+
+        for (var i = 0; i < n; i++) {
+          if (this.orientation(points[p], points[i], points[q]) == 2)
+            q = i;
+        }
+        p = q;
+
+      } while (p != l);
+      return hull
+    }
+    orientation(p, q, r) {
+      var val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+
+      if (val == 0) return 0;  // collinear
+      return (val > 0) ? 1 : 2; // clock or counterclock wise
+    }
+
+    //获取选中区的x,y,w,h
+    getCropRect(cropperMovableItems){
+      let maxX = 0, maxY = 0
+      for (let key in cropperMovableItems) {
+        let item = cropperMovableItems[key]
+        maxX = item.x > maxX ? item.x : maxX
+        maxY = item.y > maxY ? item.y : maxY
+      }
+
+      let minX = maxX, minY = maxY
+      for (let key in cropperMovableItems) {
+        let item = cropperMovableItems[key]
+        minX = item.x < minX ? item.x : minX
+        minY = item.y < minY ? item.y : minY
+      }
+
+      return {
+        x: minX,
+        y: minY,
+        w: maxX - minX,
+        h: maxY - minY
+      }
+    }
+    //move events
+    setupMoveItem(key, changedTouches, imageInfo, callback){
+    debugger;
+      let that = this
+      let cropperData = this.cropperData;
+      let cropperMovableItems = this.cropperMovableItems
+      let left = cropperData.left
+      let top = cropperData.top
+      let mode = cropperData.mode
+      let size = this.getAdjustSize(this.W, this.H, imageInfo.width, imageInfo.height)
+
+      if (changedTouches.length == 1) {
+        let touch = changedTouches[0]
+        let x = touch.clientX
+        let y = touch.clientY
+
+        // 相对画布的点
+        x = x - left
+        y = y - top
+
+        cropperMovableItems[key].x = x
+        cropperMovableItems[key].y = y
+
+        // 边界检测，使截图不超出截图区域
+        x = x < 0 ? 0 : (x > size.width ? size.width : x)
+        y = y < 0 ? 0 : (y > size.height ? size.height : y)
+        cropperMovableItems[key].x = x
+        cropperMovableItems[key].y = y
+
+        // 如果是在矩形模式下
+        if (mode == 'rectangle') {
+          // 同时设置相连两个点的位置，是相邻的两个点跟随着移动点动，保证选框为矩形
+          if (key == 'topleft') {
+            cropperMovableItems['bottomleft'].x = x
+            cropperMovableItems['topright'].y = y
+          }
+          else if (key == 'topright') {
+            cropperMovableItems['bottomright'].x = x
+            cropperMovableItems['topleft'].y = y
+          }
+          else if (key == 'bottomleft') {
+            cropperMovableItems['topleft'].x = x
+            cropperMovableItems['bottomright'].y = y
+          }
+          else if (key == 'bottomright') {
+            cropperMovableItems['topright'].x = x
+            cropperMovableItems['bottomleft'].y = y
+          }
+        }
+
+        this.drawLines(cropperMovableItems, imageInfo, function (canCrop) {
+          if (callback) {
+            callback(cropperMovableItems, canCrop)
+          }
+        })
+      }
+    }
+    //清空canvas数据
+        clearCanvas (imageInfo){
+          let cropperData = this.cropperData
+          let size = this.getAdjustSize(this.W, this.H, imageInfo.width, imageInfo.height)
+
+          if (imageInfo.path != '') {
+            let compressedScale = this.cropperData.original ? 1.0 : 0.4
+
+            //清空原图
+            let ctx = wx.createCanvasContext("originalCanvas")
+            ctx.clearRect(0, 0, imageInfo.width * compressedScale, imageInfo.height * compressedScale)
+            ctx.draw()
+
+            //清空选择区图片
+            let canvas = wx.createCanvasContext("canvas")
+            canvas.clearRect(0, 0, size.width, size.height)
+            canvas.draw()
+
+            // 清空白线框
+            let moveCanvas = wx.createCanvasContext("moveCanvas")
+            moveCanvas.clearRect(0, 0, size.width, size.height)
+            moveCanvas.draw()
+          }
+        }
+
+
+  }
+</script>

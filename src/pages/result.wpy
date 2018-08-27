@@ -1,0 +1,244 @@
+<style lang="less" scoped>
+.vsresult{
+.vsmain{
+    display:flex;
+    flex-direction:row;
+    align-items:center;
+    justify-content:space-between;
+    padding:107.6rpx 71.2rpx 120rpx 71.2rpx;
+
+    .mid{
+     image{
+      width:137rpx;
+      height:86rpx;
+     }
+    }
+    .left,.right{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:space-between;
+      color:#424242;
+      image{
+        width:200rpx;
+        height:200rpx;
+        border-radius:200rpx;
+        margin-bottom:30rpx;
+      }
+      .name{
+        width:200rpx;
+        height:38rpx;
+        line-height:38rpx;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size:36rpx;
+        margin-bottom:26rpx;
+        text-align:center;
+      }
+      .score{
+        font-size:48rpx;
+        margin-bottom:10rpx;
+      }
+      .scoredesc{
+        font-size:24rpx;
+      }
+    }
+    .left{
+       image{
+        border:6rpx solid #ff5090;
+       }
+       .score{
+        color:#ff5090;
+       }
+    }
+    .right{
+       image{
+        border:6rpx solid rgb(207,207,207);
+       }
+    }
+}
+.desc{
+      text-align:center;
+      color:#424242;
+      font-size:36rpx;
+      margin-bottom:104rpx;
+    }
+  .pkbtn{
+          width:650rpx;
+          height:88rpx;
+          line-height:88rpx;
+          background:rgba(255,80,144,1);
+          color:#fff;
+          font-size:36rpx;
+          border-radius:29rpx;
+          margin-bottom:27rpx;
+          &.pkshare{
+            background:#fff;
+            color:#ff5090;
+            border:1rpx solid #ff5090;
+          }
+     }
+     .vsmain2{
+           display:flex;
+           flex-direction:column;
+           align-items:center;
+           justify-content:center;
+           padding:107.6rpx 71.2rpx 120rpx 71.2rpx;
+           image{
+              width:200rpx;
+              height:200rpx;
+              border-radius:200rpx;
+              margin-bottom:30rpx;
+           }
+           .name{
+              width:200rpx;
+              height:38rpx;
+              line-height:38rpx;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              font-size:36rpx;
+              margin-bottom:26rpx;
+              text-align:center;
+           }
+           .score{
+               font-size:48rpx;
+               margin-bottom:10rpx;
+           }
+     }
+}
+</style>
+
+<template>
+<view>
+<view class="vsresult" wx:if="{{status==2}}">
+  <view class="vsmain">
+    <view class="left">
+      <image src="{{list[0].head_pic}}"></image>
+      <view class="name">{{list[0].name}}</view>
+      <text class="score">{{list[0].face_score}}</text>
+      <text class="scoredesc">颜值分</text>
+    </view>
+    <view class="mid">
+      <image src="../image/vs.png"></image>
+    </view>
+    <view class="right">
+      <image src="{{list[1].head_pic}}"></image>
+      <view class="name">{{list[1].name}}</view>
+      <text class="score">{{list[1].face_score}}</text>
+      <text class="scoredesc">颜值分</text>
+    </view>
+  </view>
+  <view class="desc"><text  wx:if="{{belongTo=='my'}}">自信，是一种态度</text><text wx:else>不幸败北，一定是天气原因</text></view>
+  <button class="pkbtn" bindtap="pkface">
+    <text  wx:if="{{belongTo=='my'}}">刷新颜值</text>
+    <text wx:else>不服，再来一次</text>
+  </button>
+  <button class="pkbtn pkshare" open-type="share"> 转发到群，PK群友 </button>
+</view>
+<view class="vsresult" wx:if="{{status==1}}">
+  <view class="vsmain2">
+     <image src="{{list[0].head_pic}}" class=""></image>
+     <view class="name">{{list[0].name}}</view>
+     <text class="score">{{list[0].face_score}}</text>
+     <text class="scoredesc">颜值分</text>
+  </view>
+  <view class="desc">颜值高的人，说什么都是对的</view>
+  <button class="pkbtn" bindtap="pkface">
+    <text  wx:if="{{belongTo=='my'}}">刷新颜值</text>
+    <text  wx:else>PK一下</text>
+  </button>
+</view>
+</view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import api from '../common/api'
+  export default class vsresult extends wepy.component {
+    config = {
+      'navigationBarTitleText': 'PK结果',
+    }
+    components = {
+
+    }
+    data = {
+       userInfo:{},
+       status:'',
+       page:1,
+       list:[],
+       from_uid:'',
+       belongTo:''
+    }
+    computed = {
+
+    }
+    methods = {
+      pkface(){
+        if(!this.userInfo.name){
+          api.getAuthorize().then(res=>{
+            this.userInfo=res;
+            this.$apply();
+            api.pkFaceMark(this);
+          });
+        }else{
+          api.pkFaceMark(this);
+        }
+      },
+    }
+    events = {
+      getResultData(uid){
+      wx.setStorageSync('frome_uid',uid);
+        this.from_uid=uid;
+        var userInfo=wx.getStorageSync('userInfo');
+        if(uid!=userInfo.uid){
+          this.belongTo='otherPeople';
+        }else{
+          this.belongTo='my'
+        }
+        this.$apply();
+        var options={
+          url:api.personCompete,
+          data:{
+            act:1,
+            from_uid:uid
+          }
+        };
+        api.request(options).then((res)=>{
+            if(res.data.length==2){
+              this.status=2;
+              if(res.data[0].face_score>res.data[1].face_score){
+                this.belongTo='my';
+              }else{
+                this.belongTo="otherPeople";
+              }
+            }else if(res.data.length==1){
+              this.status=1;
+            }
+            this.list=res.data;
+            this.$apply();
+            wx.hideToast();
+        }).catch(res=>{
+            wx.hideToast();
+        });;
+      },
+    }
+    onLoad(options) {
+    this.showLoading();
+    this.userInfo=wx.getStorageSync('userInfo');
+    this.$apply();
+    }
+    showCropper(res){
+      this.$emit('showCropper',res);
+    }
+    //显示正在加载
+    showLoading() {
+      wx.showToast({
+        title: "正在加载...",
+        icon: "loading",
+        duration: 10000
+      });
+    }
+  }
+</script>

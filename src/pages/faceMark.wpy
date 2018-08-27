@@ -1,0 +1,231 @@
+<style lang="less" scoped>
+.look-face{
+ .main{
+    width:694rpx;
+    height:791rpx;
+
+    padding:28rpx 28rpx 115rpx;
+    display:flex;
+    flex-drection:column;
+    justify-content:center;
+    .look{
+      position:relative;
+      width:694rpx;
+      height:791rpx;
+      .bg{
+         width:694rpx;
+         height:791rpx;
+         position:absolute;
+         top:0rpx;
+         left:0rpx;
+         z-index:1;
+      }
+      .head{
+         position:absolute;
+         z-index:2;
+         top:104rpx;
+         left:102rpx;
+         width:490rpx;
+         height:490rpx;
+       }
+       .headimg{
+        position:absolute;
+        z-index:3;
+        top:124rpx;
+        left:122rpx;
+        right:124rpx;
+        width:438rpx;
+        height:438rpx;
+        border:6rpx solid #ff5090;
+        border-radius:451rpx;
+       }
+       @keyframes rotating{
+          from {transform:rotate(0deg);}
+          to {transform:rotate(360deg);}
+       }
+       .progress{
+        position:absolute;
+        z-index:2;
+        width:362rpx;
+        height:52rpx;
+        border-radius:20rpx;
+        border:2rpx solid #ff5090;
+        bottom:93rpx;
+        left:167rpx;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        flex-direction:row;
+        image{
+          width:22rpx;
+          height:32rpx;
+        }
+       }
+    }
+
+
+ }
+ .desc{
+    text-align:center;
+ }
+}
+</style>
+
+<template>
+<welCropper></welCropper>
+<view class="look-face">
+  <view class="main">
+    <view class="look">
+    <image src="../image/lookfacebg.png" class="bg"></image>
+    <image class="head" src="../image/lookfaceborder.png" style="animation: {{setTimeChange?'rotating':''}} 2s linear infinite"></image>
+    <image class="headimg" src="{{pkPhoto}}"></image>
+    <view class="progress">
+      <image  wx:for="{{imgs}}" wx:for-index="index" wx:for-item="item" wx:key="index" src="{{item}}" ></image>
+    </view>
+    </view>
+  </view>
+  <view class="desc">
+    <view wx:if="{{result}}">正在瞻仰您的颜值……</view>
+    <view wx:else>{{resultText}}<text @tap="reupload">重新上传图片</text></view>
+  </view>
+</view>
+</template>
+
+<script>
+import wepy from 'wepy'
+import api from '../common/api'
+import welCropper from "../pages/welCropper"
+export default class Lookface extends wepy.page {
+  config = {
+    'navigationBarTitleText': '正在扫描颜值',
+  }
+  components = {
+    welCropper:welCropper,
+  }
+  data = {
+    imgs:['../image/lookface-pro.png','../image/lookface-pro.png','../image/lookface-pro.png','../image/lookface-pro.png','../image/lookface-pro.png','../image/lookface-pro.png','../image/lookface-pro.png','../image/lookface-pro.png','../image/lookface-pro.png','../image/lookface-pro.png','../image/lookface-pro.png','../image/lookface-pro.png','../image/lookface-pro.png'],
+    flag:true,
+    userInfo:{},
+    pkPhoto:'',
+    from_index:'',
+    setTimeChange:true,
+    isShow:false,
+    result:true,
+    resultText:'检测失败'
+  }
+  methods = {
+    reupload(){
+      api.pkFaceMark(this);
+    },
+  }
+  //检测颜值进度条动画
+  proChange(i){
+    if(this.flag) this.imgs[i]="../image/lookface-pro-red.png";
+    else this.imgs[i]="../image/lookface-pro.png";
+    this.$apply();
+    if(this.setTimeChange){
+      let t=setTimeout(()=>{
+        ++i;
+        if(i>12){
+          i=0;
+          this.flag=this.flag?false:true;
+          this.$apply();
+        }
+        this.proChange(i);
+      },200);
+    }
+  }
+  onLoad(options) {
+    this.from_index=options.from_index;
+    api.checkLogin().then(res=>{
+      this.userInfo=wx.getStorageSync('userInfo');
+      this.$apply();
+    });
+    this.$apply();
+  }
+  onShow() {
+    this.resetData();
+    this.isShow=true;
+    this.pkPhoto=wx.getStorageSync('pkPhoto');
+    this.$apply();
+    this.proChange(0);
+    if(this.pkPhoto!=''&&this.pkPhoto!=undefined){
+      this.uploadFace();
+    }
+  }
+  onHide(){
+    this.setTimeChange=false;
+    this.$apply();
+  }
+  //上传图片至face++
+  uploadFace(){
+    api.pkPhotoUpload(this.from_index).then(res=>{
+      wx.showToast({
+        title: '颜值得分：'+res,
+        icon: 'success',
+        duration: 2000
+      });
+      this.faceCompete(res);
+    }).catch(res=>{
+      wx.showToast({
+        title: res,
+        icon: 'warn',
+        duration: 2000
+      });
+      this.setTimeChange=false;
+      this.resultText=res;
+      this.result=false;
+      this.$apply();
+    });
+  }
+  //保存图片及颜值至服务器
+  faceCompete(res){
+    var smData={
+      act:1,
+      open_gid:wx.getStorageSync('open_gid'),
+      face_score:res,
+      head_pic:wx.getStorageSync('pkPhoto'),
+      from_uid:wx.getStorageSync('frome_uid')
+    };
+    var options={
+      url:api.faceCompete,
+      data:smData,
+      method: 'POST'
+    };
+    api.request(options).then(res=>{
+      wx.setStorageSync('pkPhoto','');
+      this.setTimeChange=false;
+      this.$apply();
+      wx.reLaunch({
+        url: `/pages/index?open_gid=`+wx.getStorageSync('open_gid')+'&frome_uid='+wx.getStorageSync('frome_uid')
+      });
+      //wx.navigateBack(1)
+    });
+
+  }
+  resetData(){
+    this.setTimeChange=true;
+  }
+  //从相册选择图片回调处理函数
+  showCropper(res){
+    this.result=true;
+    this.setTimeChange=true;
+    this.$apply();
+    this.$broadcast('showCropper',{
+      src: res.path,
+      isHidden:false,
+      originalSize:{
+        width:res.width,
+        height:res.height
+      },
+      cropCallback:(res)=>{
+        this.pkPhoto=res;
+        wx.setStorageSync('pkPhoto', res);
+        this.uploadFace();
+        this.$apply();
+      }
+    })
+  }
+}
+
+</script>
